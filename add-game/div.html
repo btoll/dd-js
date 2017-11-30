@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title></title>
+<style>
+.empty {
+    font-size: 12px;
+    font-style: italic;
+}
+.team.over {
+    background: white;
+    border: 1px dashed black;
+}
+.match {
+    border: 2px solid green;
+    margin: 20px;
+}
+#dropzone {
+    border: 2px solid black;
+    height: 260px;
+    margin: 20px;
+    overflow: auto;
+}
+[draggable], .team {
+    background: yellow;
+    border: 1px solid blue;
+    height: 20px;
+    margin: 10px;
+    padding: 5px;
+}
+
+button {
+    margin-left: 20px;
+}
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const dropZones = document.querySelectorAll('#dropzone');
+    const addGameButton = document.querySelector('button');
+    let dragSrcEl = null;
+
+    function init() {
+        ['John', 'Paul', 'George', 'Ringo'].forEach(s => {
+            dropZones[1].appendChild(createDraggableEl(s));
+        });
+
+        enableDD();
+
+        addGameButton.addEventListener('click', () => {
+            const frag = document.createDocumentFragment();
+            const parent = document.createElement('div');
+
+            parent.classList.add('match');
+
+            frag.appendChild(addEmptyRow());
+            frag.appendChild(addEmptyRow());
+
+            parent.appendChild(frag);
+            dropZones[0].appendChild(parent);
+        });
+    }
+
+    function addEmptyRow() {
+        const child = document.createElement('span');
+        child.classList.add('empty');
+        child.appendChild(document.createTextNode('Drop name here'));
+
+        const parent = document.createElement('div');
+        parent.classList.add('team');
+        parent.appendChild(child);
+
+        return parent;
+    }
+
+    function enableDD() {
+        dropZones.forEach(zone => {
+            zone.addEventListener('dragstart', handleDragStart);
+            zone.addEventListener('dragover', handleDragOver);
+            zone.addEventListener('dragend', handleDragEnd);
+            zone.addEventListener('dragenter', handleDragEnter);
+            zone.addEventListener('dragleave', handleDragLeave);
+            zone.addEventListener('drop', handleDrop);
+        });
+    }
+
+    function createDraggableEl(s, cls) {
+        const el = document.createElement('div');
+        el.innerHTML = s;
+        el.setAttribute('draggable', 'true');
+
+        if (cls) {
+            el.classList.add(cls);
+        }
+
+        return el;
+    }
+
+    function handleDragStart(e) {
+        dragSrcEl = e.target;
+        dragSrcEl.style.opacity = '0.4';
+
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/html', dragSrcEl.innerHTML);
+    }
+
+    function handleDragOver(e) {
+        if (
+            e.target.classList.contains('team') ||
+
+            (e.target.id === 'dropzone' &&
+            e.target.classList.contains('pool') &&
+            !e.target.contains(dragSrcEl))
+        ) {
+            // Necessary. Allows for the drop.
+            if (e.preventDefault) {
+                e.preventDefault();
+            }
+
+            e.dataTransfer.dropEffect = 'move';
+        }
+
+        return false;
+    }
+
+    function handleDragEnter(e) {
+        const target = e.target;
+        if (target.classList.contains('team')) {
+            target.classList.add('over');
+        }
+    }
+
+    function handleDragLeave(e) {
+        const target = e.target;
+        if (target.classList.contains('team')) {
+            target.classList.remove('over');
+        }
+    }
+
+    function handleDrop(e) {
+        // Stop the browser from redirecting.
+        if (e.stopPropagation) {
+            e.stopPropagation();
+        }
+
+        const target = e.target;
+        const targetParent = target.parentNode;
+        const inPool = target.classList.contains('pool');
+
+        if (inPool) {
+            // We're dragging from a match back into the default pool.
+            // Default to appending at the end of the node list.
+            dragSrcEl.parentNode.insertBefore(addEmptyRow(), dragSrcEl);
+            target.insertBefore(dragSrcEl, null);
+        } else if (dragSrcEl.parentNode.classList.contains('match')) {
+            if (targetParent.contains(dragSrcEl)) {
+                targetParent.insertBefore(addEmptyRow(), dragSrcEl);
+            } else {
+                dragSrcEl.parentNode.insertBefore(addEmptyRow(), dragSrcEl);
+            }
+        }
+
+        if (!inPool) {
+            targetParent.insertBefore(dragSrcEl, target);
+            targetParent.removeChild(target);
+        }
+
+        //e.dataTransfer.getData('text/html');
+
+        return false;
+    }
+
+    function handleDragEnd(e) {
+        dropZones.forEach(zone => {
+            zone.classList.remove('over');
+        })
+
+        e.target.style.opacity = '1';
+    }
+
+    init();
+});
+</script>
+</head>
+
+<body>
+    <div id="dropzone">
+    </div>
+
+    <button>ADD GAME</button>
+
+    <div id="dropzone" class="pool">
+    </div>
+</body>
+</html>
+
