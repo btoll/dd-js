@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title></title>
+<style>
+.hidden {
+    visibility: hidden;
+}
+
+.match {
+    border: 2px solid green;
+    margin: 20px;
+}
+
+.team.over td {
+    background: #999;
+    /*border: 1px dashed black;*/
+}
+
+.placeholder {
+    display: inline-block;
+    font-size: 12px;
+    font-style: italic;
+    width: 120px;
+}
+
+#dropzone {
+    border: 2px solid black;
+    height: 230px;
+    margin: 20px;
+    overflow: auto;
+}
+
+[draggable], .team {
+    background: white;
+    border: 1px solid blue;
+    height: 20px;
+    margin: 10px;
+    padding: 5px;
+}
+
+[type="checkbox"] {
+    margin: 5px;
+    width: 10px;
+}
+
+[type="text"] {
+    margin: 5px;
+    width: 35px;
+}
+
+/* Chain the attributes to increase the specificity. */
+[type="text"][placeholder] {
+    width: 110px;
+}
+
+button {
+    margin-left: 20px;
+}
+
+p {
+    background: aqua;
+    border: 1px solid black;
+    font-weight: bold;
+    margin: 20px;
+    padding: 20px 20px 20px 10px;
+}
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const dropZones = document.querySelectorAll('#dropzone');
+    let dragSrcEl = null;
+    const EMPTY_TEXT = 'Drop team here';
+
+    // TODO: Cleanup `init` function.
+    function init() {
+        const frag = document.createDocumentFragment();
+
+        // This would be the response data from a network request.
+        ['Team 1', 'Team 2', 'Team 3', 'Team 4'].forEach(text => {
+            frag.appendChild(createDraggableRow(text));
+        });
+
+        document.querySelector('#dropzone.pool table tbody').appendChild(frag);
+
+        enableDD();
+
+        document.querySelector('button').addEventListener('click', () => {
+            const tbody = document.createElement('tbody');
+
+            tbody.appendChild(createSummaryRow('Start Date/Time'));
+            tbody.appendChild(createTeamRow(EMPTY_TEXT));
+            tbody.appendChild(createTeamRow(EMPTY_TEXT));
+            tbody.classList.add('match');
+
+            // Note this will find the first dropzone, which could produce buggy behavior, depending if the markup
+            // is changed or added to!
+            document.querySelector('#dropzone table').appendChild(tbody);
+        });
+    }
+
+    function createDraggableRow(text) {
+        const row = createTeamRow(text);
+        row.setAttribute('draggable', 'true');
+
+        return row;
+    }
+
+    function createInputCell(type) {
+        const child = document.createElement('input');
+        child.setAttribute('type', type);
+
+        // TODO: Use `insertCell` api?
+        // https://developer.mozilla.org/en-US/docs/Web/API/HTMLTableRowElement/insertCell
+        const parent = document.createElement('td');
+        parent.classList.add('hidden');
+        parent.appendChild(child);
+        return parent;
+    }
+
+    function createPlaceholderCell(placeholder) {
+        const td = createInputCell('text');
+        td.firstChild.setAttribute('placeholder', placeholder);
+        // This is a little hinky b/c all newly-created rows hide their cells by default until a team row is dragged to it.
+        td.classList.remove('hidden');
+        return td;
+    }
+
+    function createSummaryRow(text) {
+        const row = document.createElement('tr');
+
+        row.appendChild(createPlaceholderCell(text));
+        row.appendChild(createInputCell('text'));
+        row.appendChild(createInputCell('text'));
+        row.appendChild(createInputCell('text'));
+        row.classList.add('team');
+
+        return row;
+    }
+
+    function createTeamRow(text) {
+        const row = document.createElement('tr');
+
+        row.appendChild(createTextCell(text));
+        row.appendChild(createInputCell('checkbox'));
+        row.appendChild(createInputCell('checkbox'));
+        row.appendChild(createInputCell('text'));
+        row.classList.add('team');
+
+        return row;
+    }
+
+    function createTextCell(text) {
+        const child = document.createElement('td');
+        child.classList.add('placeholder');
+        child.appendChild(document.createTextNode(text));
+        return child;
+    }
+
+    function enableDD() {
+        dropZones.forEach(zone => {
+            zone.addEventListener('dragstart', handleDragStart);
+            zone.addEventListener('dragover', handleDragOver);
+            zone.addEventListener('dragend', handleDragEnd);
+            zone.addEventListener('dragenter', handleDragEnter);
+            zone.addEventListener('dragleave', handleDragLeave);
+            zone.addEventListener('drop', handleDrop);
+        });
+    }
+
+    function handleDragStart(e) {
+        dragSrcEl = e.target;
+        dragSrcEl.style.opacity = '0.4';
+
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/html', dragSrcEl.innerHTML);
+    }
+
+    function handleDragOver(e) {
+        if (
+            e.target.classList.contains('team') ||
+
+            (e.target.id === 'dropzone' &&
+            e.target.classList.contains('pool') &&
+            !e.target.contains(dragSrcEl))
+        ) {
+            // Necessary. Allows for the drop.
+            if (e.preventDefault) {
+                e.preventDefault();
+            }
+
+            e.dataTransfer.dropEffect = 'move';
+        }
+
+        return false;
+    }
+
+    function handleDragEnter(e) {
+        const target = e.target;
+        if (target.classList.contains('team')) {
+            target.classList.add('over');
+        }
+    }
+
+    function handleDragLeave(e) {
+        const target = e.target;
+        if (target.classList.contains('team')) {
+            target.classList.remove('over');
+        }
+    }
+
+    function handleDrop(e) {
+        // Stop the browser from redirecting.
+        if (e.stopPropagation) {
+            e.stopPropagation();
+        }
+
+        const target = e.target;
+        const targetParent = target.parentNode;
+        const inPool = target.classList.contains('pool');
+
+        // TODO: This whole block and the next needs to be cleaned up.
+        if (inPool) {
+            // We're dragging from a match back into the default pool.
+            // Default to appending at the end of the node list.
+            dragSrcEl.parentNode.insertBefore(createTeamRow(EMPTY_TEXT), dragSrcEl);
+            target.querySelector('table tbody').insertBefore(dragSrcEl, null);
+
+            // TODO: Is `cells` collection on the row element standardized?
+            // Also, let's not do this every time!!
+            const cells = dragSrcEl.childNodes;
+            for (let i = 1, len = cells.length; i < len; i++) {
+                cells[i].classList.add('hidden');
+            }
+        } else if (dragSrcEl.parentNode.classList.contains('match')) {
+            if (targetParent.contains(dragSrcEl)) {
+                targetParent.insertBefore(createTeamRow(EMPTY_TEXT), dragSrcEl);
+            } else {
+                dragSrcEl.parentNode.insertBefore(createTeamRow(EMPTY_TEXT), dragSrcEl);
+            }
+            debugger;
+        }
+
+        if (!inPool) {
+            targetParent.insertBefore(dragSrcEl, target);
+            targetParent.removeChild(target);
+
+            // TODO: Is `cells` collection on the row element standardized?
+            // Also, let's not do this every time!!
+            const cells = dragSrcEl.childNodes;
+            for (let i = 0, len = cells.length; i < len; i++) {
+                const cell = cells[i];
+
+                if (cell.classList.contains('hidden')) {
+                    cell.classList.remove('hidden');
+                }
+            }
+
+        }
+
+        //e.dataTransfer.getData('text/html');
+        return false;
+    }
+
+    function handleDragEnd(e) {
+        dropZones.forEach(zone => {
+            zone.classList.remove('over');
+        })
+
+        e.target.style.opacity = '1';
+    }
+
+    init();
+});
+</script>
+</head>
+
+<body>
+    <p>Game Pairings</p>
+    <div id="dropzone">
+        <table>
+            <thead>
+                <th>Game Date/Time</th>
+                <th>Favorite</th>
+                <th>Winner</th>
+                <th>Final Score</th>
+            </thead>
+        </table>
+    </div>
+
+    <button>ADD GAME</button>
+
+    <div id="dropzone" class="pool">
+        <table>
+            <thead>
+                <th colspan="4">Available teams</th>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
+
